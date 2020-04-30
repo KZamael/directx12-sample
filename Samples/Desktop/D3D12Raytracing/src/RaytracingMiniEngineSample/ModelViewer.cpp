@@ -1808,7 +1808,7 @@ void RaytracingMiniEngineSample::Raytrace(class GraphicsContext& gfxContext)
     case RTM_REFLECTIONS:
         RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
         break;
-    case RTM_PARTY:
+    case RTM_PARTY: // TODO - not implemented yet.
         RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
         partyIsHard = true;
         break;

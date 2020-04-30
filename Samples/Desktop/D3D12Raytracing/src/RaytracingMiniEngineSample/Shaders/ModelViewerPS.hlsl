@@ -368,8 +368,7 @@ MRT main(VSOutput vsOutput)
 
  
     //****LIGHT SPOTS****   
-
-    /*
+    
     // Tiles
 
     uint2 tilePos = GetTilePos(pixelPos, InvTileDim.xy);
@@ -656,7 +655,7 @@ MRT main(VSOutput vsOutput)
 
     //****LIGHT SPOTS END****
 
-    */
+    
 
     mrt.Color = colorSum;
 
