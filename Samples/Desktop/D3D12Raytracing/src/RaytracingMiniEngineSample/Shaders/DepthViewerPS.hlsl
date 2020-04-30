@@ -26,5 +26,6 @@ SamplerState        sampler0        : register(s0);
 void main(VSOutput vsOutput)
 {
     if (texDiffuse.Sample(sampler0, vsOutput.uv).a < 0.5)
+    //if (texDiffuse.Sample(sampler0, vsOutput.uv).a < 1)
         discard;
 }

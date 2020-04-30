@@ -297,7 +297,7 @@ float3 ApplyConeShadowedLight(
 # define SPOT_LIGHT_GROUPS            2
 # define SHADOWED_SPOT_LIGHT_GROUPS    1
 # define POINT_LIGHT_GROUPS_TAIL            POINT_LIGHT_GROUPS
-# define SPOT_LIGHT_GROUPS_TAIL             POINT_LIGHT_GROUPS_TAIL + SPOT_LIGHT_GROUPS
+# define SPOT_LIGHT_GROUPS_TAIL                POINT_LIGHT_GROUPS_TAIL + SPOT_LIGHT_GROUPS
 # define SHADOWED_SPOT_LIGHT_GROUPS_TAIL    SPOT_LIGHT_GROUPS_TAIL + SHADOWED_SPOT_LIGHT_GROUPS
 
 
@@ -635,4 +635,5 @@ float3 main(VSOutput vsOutput) : SV_Target0
 #endif
 
     return colorSum;
+    
 }

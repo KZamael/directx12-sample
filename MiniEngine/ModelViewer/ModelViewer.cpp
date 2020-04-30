@@ -464,7 +464,7 @@ void ModelViewer::RenderScene( void )
 
     SSAO::Render(gfxContext, m_Camera);
 
-    //Lighting::FillLightGrid(gfxContext, m_Camera);
+    Lighting::FillLightGrid(gfxContext, m_Camera);
 
     if (!SSAO::DebugDraw)
     {

@@ -95,6 +95,8 @@ DynamicCB           g_dynamicCb;
 CComPtr<ID3D12RootSignature> g_GlobalRaytracingRootSignature;
 CComPtr<ID3D12RootSignature> g_LocalRaytracingRootSignature;
 
+bool partyIsHard;
+
 enum RaytracingTypes
 {
     Primarybarycentric = 0,
@@ -851,6 +853,8 @@ void RaytracingMiniEngineSample::Startup( void )
     ASSERT(bModelLoadSuccess, "Failed to load model");
     ASSERT(m_Model.m_Header.meshCount > 0, "Model contains no meshes");
 
+    partyIsHard = false;
+
     // The caller of this function can override which materials are considered cutouts
     m_pMaterialIsCutout.resize(m_Model.m_Header.materialCount);
     m_pMaterialIsReflective.resize(m_Model.m_Header.materialCount);
@@ -1480,6 +1484,8 @@ void Raytracebarycentrics(
 {
     ScopedTimer _st(L"Raytracing barycentrics", context);
 
+    ParticleEffects::Update(context.GetComputeContext(), Graphics::GetFrameTime());
+
     // Prepare constants
     DynamicCB inputs = g_dynamicCb;
     auto m0 = camera.GetViewProjMatrix();
@@ -1528,6 +1534,8 @@ void RaytracebarycentricsSSR(
     ColorBuffer& normals)
 {
     ScopedTimer _st(L"Raytracing SSR barycentrics", context);
+
+    ParticleEffects::Update(context.GetComputeContext(), Graphics::GetFrameTime());
 
     DynamicCB inputs = g_dynamicCb;
     auto m0 = camera.GetViewProjMatrix();
@@ -1578,6 +1586,8 @@ void RaytracingMiniEngineSample::RaytraceShadows(
     DepthBuffer& depth)
 {
     ScopedTimer _st(L"Raytracing Shadows", context);
+
+    ParticleEffects::Update(context.GetComputeContext(), Graphics::GetFrameTime());
 
     DynamicCB inputs = g_dynamicCb;
     auto m0 = camera.GetViewProjMatrix();
@@ -1635,6 +1645,8 @@ void RaytracingMiniEngineSample::RaytraceDiffuse(
 {
     ScopedTimer _st(L"RaytracingWithHitShader", context);
 
+    ParticleEffects::Update(context.GetComputeContext(), Graphics::GetFrameTime());
+
     // Prepare constants
     DynamicCB inputs = g_dynamicCb;
     auto m0 = camera.GetViewProjMatrix();
@@ -1690,6 +1702,8 @@ void RaytracingMiniEngineSample::RaytraceReflections(
     ColorBuffer& normals)
 {
     ScopedTimer _st(L"RaytracingWithHitShader", context);
+
+    ParticleEffects::Update(context.GetComputeContext(), Graphics::GetFrameTime());
 
     // Prepare constants
     DynamicCB inputs = g_dynamicCb;
@@ -1795,7 +1809,8 @@ void RaytracingMiniEngineSample::Raytrace(class GraphicsContext& gfxContext)
         RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
         break;
     case RTM_PARTY:
-        // TODO: Shader has to be defined here...
+        RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
+        partyIsHard = true;
         break;
     }
 

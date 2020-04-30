@@ -25,6 +25,6 @@ SamplerState        sampler0        : register(s0);
 [RootSignature(ModelViewer_RootSig)]
 void main(VSOutput vsOutput)
 {
-    if (texDiffuse.Sample(sampler0, vsOutput.uv).a < 0.5)
+    if (texDiffuse.Sample(sampler0, vsOutput.uv).a < 1)
         discard;
 }

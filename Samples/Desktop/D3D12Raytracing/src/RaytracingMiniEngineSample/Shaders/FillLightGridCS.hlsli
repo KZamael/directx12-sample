@@ -19,12 +19,12 @@
 #define FLT_MIN         1.175494351e-38F        // min positive value
 #define FLT_MAX         3.402823466e+38F        // max value
 #define PI                3.1415926535f
-#define TWOPI            6.283185307f
+#define TWOPI            6.283185307f           // 2 * PI
 
 #define WORK_GROUP_THREADS (WORK_GROUP_SIZE_X * WORK_GROUP_SIZE_Y * WORK_GROUP_SIZE_Z)
 
-
-cbuffer CSConstants : register(b0)
+// Camera properties (viewport), (inverse tile dimension), (z-depth), (amount of tiles), (view projection matrix)
+cbuffer CSConstants : register(b0) // Optional keyword for assigning a shader variable to a particular register
 {
     uint ViewportWidth, ViewportHeight;
     float InvTileDim;
@@ -33,18 +33,20 @@ cbuffer CSConstants : register(b0)
     float4x4 ViewProjMatrix;
 };
 
-StructuredBuffer<LightData> lightBuffer : register(t0);
-Texture2D<float> depthTex : register(t1);
-RWByteAddressBuffer lightGrid : register(u0);
-RWByteAddressBuffer lightGridBitMask : register(u1);
+StructuredBuffer<LightData> lightBuffer : register(t0); 
+Texture2D<float> depthTex : register(t1); 
+RWByteAddressBuffer lightGrid : register(u0); // rectangular viewport
+RWByteAddressBuffer lightGridBitMask : register(u1); 
 
-groupshared uint minDepthUInt;
-groupshared uint maxDepthUInt;
+groupshared uint minDepthUInt; // group shared read/write variable which stays in sync and order for minimal depth
+groupshared uint maxDepthUInt;  // ... for maximal depth
 
+// tile counts for sphere, cone and shadow-cone...
 groupshared uint tileLightCountSphere;
 groupshared uint tileLightCountCone;
 groupshared uint tileLightCountConeShadowed;
 
+// ...and Indices for these exact geometric ways to lighten
 groupshared uint tileLightIndicesSphere[MAX_LIGHTS];
 groupshared uint tileLightIndicesCone[MAX_LIGHTS];
 groupshared uint tileLightIndicesConeShadowed[MAX_LIGHTS];
@@ -99,11 +101,12 @@ void main(
     GroupMemoryBarrierWithGroupSync();
     //float tileMinDepth = asfloat(minDepthUInt);
     //float tileMaxDepth = asfloat(maxDepthUInt);
-    float tileMinDepth = (rcp(asfloat(maxDepthUInt)) - 1.0) * RcpZMagic;
-    float tileMaxDepth = (rcp(asfloat(minDepthUInt)) - 1.0) * RcpZMagic;
+    float tileMinDepth = (rcp(asfloat(maxDepthUInt)) - 1.0) * RcpZMagic; // max reciproke (=kehrwert) depth - 1 * reciproke Z 
+    float tileMaxDepth = (rcp(asfloat(minDepthUInt)) - 1.0) * RcpZMagic; // min reciproke (=kehrwert) depth - 1 * reciproke Z
     float tileDepthRange = tileMaxDepth - tileMinDepth;
     tileDepthRange = max(tileDepthRange, FLT_MIN); // don't allow a depth range of 0
-    float invTileDepthRange = rcp(tileDepthRange);
+    float invTileDepthRange = rcp(tileDepthRange); // Inverse tile depth range
+    
     // TODO: near/far clipping planes seem to be falling apart at or near the max depth with infinite projections
 
     // construct transform from world space to tile space (projection space constrained to tile area)
@@ -114,15 +117,16 @@ void main(
         -2.0 * float(groupID.x) + invTileSize2X.x - 1.0,
         -2.0 * float(groupID.y) + invTileSize2X.y - 1.0,
         -tileMinDepth * invTileDepthRange);
+
     float4x4 projToTile = float4x4(
         invTileSize2X.x, 0, 0, tileBias.x,
         0, -invTileSize2X.y, 0, tileBias.y,
         0, 0, invTileDepthRange, tileBias.z,
         0, 0, 0, 1
         );
-    float4x4 tileMVP = mul(projToTile, ViewProjMatrix);
+    float4x4 tileMVP = mul(projToTile, ViewProjMatrix); // Model View Projection from projection of the Tile to VPM
     
-    // extract frustum planes (these will be in world space)
+    // extract frustum planes (these will be in world space) https://gamedev.stackexchange.com/questions/156743/finding-the-normals-of-the-planes-of-a-view-frustum
     float4 frustumPlanes[6];
     frustumPlanes[0] = tileMVP[3] + tileMVP[0];
     frustumPlanes[1] = tileMVP[3] - tileMVP[0];
@@ -135,6 +139,7 @@ void main(
         frustumPlanes[n] *= rsqrt(dot(frustumPlanes[n].xyz, frustumPlanes[n].xyz));
     }
 
+    // Index and offset of all tiles of the light grid
     uint tileIndex = GetTileIndex(groupID.xy, TileCountX);
     uint tileOffset = GetTileOffset(tileIndex);
 
