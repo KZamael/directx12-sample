@@ -1285,9 +1285,9 @@ void RaytracingMiniEngineSample::RenderScene(void)
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Render");
 
     ParticleEffects::Update(gfxContext.GetComputeContext(), Graphics::GetFrameTime());
-
     uint32_t FrameIndex = TemporalEffects::GetFrameIndexMod2();
 
+    // Got that from ModelViewerPS.hlsl
     __declspec(align(16)) struct
     {
         Vector3 sunDirection;
@@ -1809,8 +1809,8 @@ void RaytracingMiniEngineSample::Raytrace(class GraphicsContext& gfxContext)
         RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
         break;
     case RTM_PARTY: // TODO - not implemented yet.
-        RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
         partyIsHard = true;
+        RaytraceReflections(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_SceneNormalBuffer);
         break;
     }
 
@@ -1842,7 +1842,7 @@ void RaytracingMiniEngineSample::CreateParticleEffects()
     Smoke.TexturePath = L"smoke.dds";
 
     Smoke.TotalActiveLifetime = FLT_MAX;
-    Smoke.EmitProperties.MaxParticles = 25;
+    Smoke.EmitProperties.MaxParticles = 20;
     Smoke.EmitProperties.EmitPosW = Smoke.EmitProperties.LastEmitPosW = XMFLOAT3(1120.0f, 185.0f, -445.0f);
     Smoke.EmitRate = 64.0f;
     Smoke.LifeMinMax = XMFLOAT2(2.5f, 4.0f);

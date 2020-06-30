@@ -45,8 +45,6 @@ Texture2D<float4> texReflection    : register(t5);
 Texture2D<float> texSSAO            : register(t64);
 Texture2D<float> texShadow            : register(t65);
 
-extern bool partyIsHard;
-
 StructuredBuffer<LightData> lightBuffer : register(t66);
 Texture2DArray<float> lightShadowArrayTex : register(t67);
 ByteAddressBuffer lightGrid : register(t68);
@@ -84,6 +82,7 @@ void AntiAliasSpecular(inout float3 texNormal, inout float gloss)
 }
 
 // Apply fresnel to modulate the specular albedo
+
 // ,das Maß für die diffuse Streukraft verschiedener Materialien für Simulationen der Volumenstreuung. 
 void FSchlick(inout float3 specular, inout float3 diffuse, float3 lightDir, float3 halfVec)
 {
@@ -107,11 +106,11 @@ float GetShadow(float3 ShadowCoord)
 #ifdef SINGLE_SAMPLE
     float result = ShadowMap.SampleCmpLevelZero(shadowSampler, ShadowCoord.xy, ShadowCoord.z);
 #else
-    const float Dilation = 2.0;
-    float d1 = Dilation * ShadowTexelSize.x * 0.125;
-    float d2 = Dilation * ShadowTexelSize.x * 0.875;
-    float d3 = Dilation * ShadowTexelSize.x * 0.625;
-    float d4 = Dilation * ShadowTexelSize.x * 0.375;
+    const float dilation = 2.0;
+    float d1 = dilation * ShadowTexelSize.x * 0.125;
+    float d2 = dilation * ShadowTexelSize.x * 0.875;
+    float d3 = dilation * ShadowTexelSize.x * 0.625;
+    float d4 = dilation * ShadowTexelSize.x * 0.375;
     float result = (
         2.0 * texShadow.SampleCmpLevelZero(shadowSampler, ShadowCoord.xy, ShadowCoord.z) +
         texShadow.SampleCmpLevelZero(shadowSampler, ShadowCoord.xy + float2(-d2, d1), ShadowCoord.z) +
@@ -332,15 +331,15 @@ MRT main(VSOutput vsOutput)
     MRT mrt;
     mrt.Color = 0.0;
     mrt.Normal = 0.0;
-
+    // pixelposition
     uint2 pixelPos = uint2(vsOutput.position.xy);
 # define SAMPLE_TEX(texName) texName.Sample(sampler0, vsOutput.uv)
 
     float3 diffuseAlbedo = SAMPLE_TEX(texDiffuse);
     float3 colorSum = 0;
     {
-        float ao = texSSAO[pixelPos];
-        colorSum += ApplyAmbientLight(diffuseAlbedo, ao, AmbientColor);
+        float ambientOcclusion = texSSAO[pixelPos];
+        colorSum += ApplyAmbientLight(diffuseAlbedo, ambientOcclusion, AmbientColor);
     }
 
     float gloss = 128.0;
@@ -348,12 +347,12 @@ MRT main(VSOutput vsOutput)
     {
         normal = SAMPLE_TEX(texNormal) * 2.0 - 1.0;
         AntiAliasSpecular(normal, gloss);
+        // read from vertex shader
         float3x3 tbn = float3x3(normalize(vsOutput.tangent), normalize(vsOutput.bitangent), normalize(vsOutput.normal));
+        // world-space normal through scalar * matrix
         normal = mul(normal, tbn);
-
         // Normalize result...
         float lenSq = dot(normal, normal);
-
         // Some Sponza content appears to have no tangent space provided, resulting in degenerate normal vectors.
         if (!isfinite(lenSq) || lenSq < 1e-6)
             return mrt;
@@ -361,13 +360,14 @@ MRT main(VSOutput vsOutput)
         normal *= rsqrt(lenSq);
     }
 
-    float3 specularAlbedo = float3(0.56, 0.56, 0.56);
+    float3 specAlbedo = float3(0.56, 0.56, 0.56);
     float specularMask = SAMPLE_TEX(texSpecular).g;
     float3 viewDir = normalize(vsOutput.viewDir);
-    colorSum += ApplyDirectionalLight(diffuseAlbedo, specularAlbedo, specularMask, gloss, normal, viewDir, SunDirection, SunColor, vsOutput.shadowCoord);
+    colorSum += ApplyDirectionalLight(diffuseAlbedo, specAlbedo, specularMask, gloss, normal, viewDir, SunDirection, SunColor, vsOutput.shadowCoord);
+    
+    /*
+    //****LIGHT SPOTS****   TODO: Commented out, due to problems with transition Artifacts.
 
- 
-    //****LIGHT SPOTS****   
     
     // Tiles
 
@@ -655,7 +655,7 @@ MRT main(VSOutput vsOutput)
 
     //****LIGHT SPOTS END****
 
-    
+    */
 
     mrt.Color = colorSum;
 

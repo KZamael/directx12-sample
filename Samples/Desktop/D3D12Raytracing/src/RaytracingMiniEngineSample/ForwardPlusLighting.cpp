@@ -310,7 +310,7 @@ void Lighting::FillLightGrid(GraphicsContext& gfxContext, const Camera& camera)
         uint32_t TileCount;
         Matrix4 ViewProjMatrix;
     } csConstants;
-    // todo: assumes 1920x1080 resolution
+    // TODO: assumes 1920x1080 resolution
     csConstants.ViewportWidth = g_SceneColorBuffer.GetWidth();
     csConstants.ViewportHeight = g_SceneColorBuffer.GetHeight();
     csConstants.InvTileDim = 1.0f / LightGridDim;

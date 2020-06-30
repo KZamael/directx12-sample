@@ -31,20 +31,20 @@
         + Bloom ...
              Enable:  on
              High Quality:  on
-             Scatter:  0.900000
-             Strength:  0.350000
-             Threshold:  3.100001
+             Scatter:  0.650000
+             Strength:  0.100000
+             Threshold:  4.000000
         + Depth of Field ...
-             AntiSparkle:  3.000000
+             AntiSparkle:  1.000000
              Debug Mode:  Off
              Debug Tiles:  off
              Enable:  off
              FG Range:  100.000000
              Focal Center:  0.100000
              Focal Radius:  0.100000
-             Force Fast Path:  on
-             Force Slow Path:  on
-             Median Alpha:  on
+             Force Fast Path:  off
+             Force Slow Path:  off
+             Median Alpha:  off
              Median Filter:  on
              PreFilter:  on
         + Display ...
@@ -63,8 +63,8 @@
              Adaptive Exposure:  on
              Draw Histogram:  off
              Enable:  on
-             Exposure:  1.189207
-             Key:  0.070000
+             Exposure:  2.000000
+             Key:  0.080000
              Max Exposure:  64.000000
              Min Exposure:  0.015625
         + Motion Blur ...
@@ -85,10 +85,10 @@
              Debug Draw:  off
              Enable:  on
              Hierarchy Depth:  3
-             Noise Filter Threshold (log10):  -2.500000
+             Noise Filter Threshold (log10):  -3.000000
              Quality Level:  Very High
-             Rejection Falloff (rcp):  2.500000
-             Upsample Tolerance (log10):  -7.000000
+             Rejection Falloff (rcp):  3.500000
+             Upsample Tolerance (log10):  -5.500000
    + Timing ...
         Drop Random Frames:  off
         Limit To 30Hz:  off
