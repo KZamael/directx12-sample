@@ -63,6 +63,7 @@ cbuffer PSConstants : register(b0)
     uint FrameIndexMod2;
 }
 
+// Normals are only needed where 
 cbuffer MaterialInfo : register(b1)
 {
     uint AreNormalsNeeded;
@@ -83,7 +84,7 @@ void AntiAliasSpecular(inout float3 texNormal, inout float gloss)
 
 // Apply fresnel to modulate the specular albedo
 
-// ,das Maß für die diffuse Streukraft verschiedener Materialien für Simulationen der Volumenstreuung. 
+// Maß für die diffuse Streukraft verschiedener Materialien für Simulationen der Volumenstreuung. 
 void FSchlick(inout float3 specular, inout float3 diffuse, float3 lightDir, float3 halfVec)
 {
     float fresnel = pow(1.0 - saturate(dot(lightDir, halfVec)), 5.0);
@@ -294,7 +295,45 @@ float3 ApplyConeShadowedLight(
     );
 }
 
-#define POINT_LIGHT_PARAMS \
+// options for F+ variants and optimizations
+#ifdef _WAVE_OP // SM 6.0 (new shader compiler)
+
+// choose one of these:
+//# define BIT_MASK
+# define BIT_MASK_SORTED
+//# define SCALAR_LOOP
+//# define SCALAR_BRANCH
+
+// enable to amortize latency of vector read in exchange for additional VGPRs being held
+# define LIGHT_GRID_PRELOADING
+
+// configured for 32 sphere lights, 64 cone lights, and 32 cone shadowed lights
+# define POINT_LIGHT_GROUPS            1
+# define SPOT_LIGHT_GROUPS            2
+# define SHADOWED_SPOT_LIGHT_GROUPS    1
+# define POINT_LIGHT_GROUPS_TAIL            POINT_LIGHT_GROUPS
+# define SPOT_LIGHT_GROUPS_TAIL                POINT_LIGHT_GROUPS_TAIL + SPOT_LIGHT_GROUPS
+# define SHADOWED_SPOT_LIGHT_GROUPS_TAIL    SPOT_LIGHT_GROUPS_TAIL + SHADOWED_SPOT_LIGHT_GROUPS
+
+
+uint GetGroupBits(uint groupIndex, uint tileIndex, uint lightBitMaskGroups[4])
+{
+#ifdef LIGHT_GRID_PRELOADING
+    return lightBitMaskGroups[groupIndex];
+#else
+    return lightGridBitMask.Load(tileIndex * 16 + groupIndex * 4);
+#endif
+}
+
+uint64_t Ballot64(bool b)
+{
+    uint4 ballots = WaveActiveBallot(b);
+    return (uint64_t)ballots.y << 32 | (uint64_t)ballots.x;
+}
+
+#endif // _WAVE_OP
+
+/*#define POINT_LIGHT_PARAMS \
     diffuseAlbedo, \
     specularAlbedo, \
     specularMask, \
@@ -306,11 +345,12 @@ float3 ApplyConeShadowedLight(
     lightData.radiusSq, \
     lightData.color
 
-#define SPOT_LIGHT_PARAMS \
+  #define SPOT_LIGHT_PARAMS \
     POINT_LIGHT_PARAMS,    lightData.coneDir, lightData.coneAngles
 
-#define SHADOWED_LIGHT_PARAMS \
+  #define SHADOWED_LIGHT_PARAMS \
     SPOT_LIGHT_PARAMS, lightData.shadowTextureMatrix, lightIndex
+ */
 
 uint PullNextBit(inout uint bits)
 {
@@ -360,10 +400,11 @@ MRT main(VSOutput vsOutput)
         normal *= rsqrt(lenSq);
     }
 
-    float3 specAlbedo = float3(0.56, 0.56, 0.56);
+    float3 specularAlbedo = float3(0.56, 0.56, 0.56);
     float specularMask = SAMPLE_TEX(texSpecular).g;
     float3 viewDir = normalize(vsOutput.viewDir);
-    colorSum += ApplyDirectionalLight(diffuseAlbedo, specAlbedo, specularMask, gloss, normal, viewDir, SunDirection, SunColor, vsOutput.shadowCoord);
+    
+    colorSum += ApplyDirectionalLight(diffuseAlbedo, specularAlbedo, specularMask, gloss, normal, viewDir, SunDirection, SunColor, vsOutput.shadowCoord);
     
     /*
     //****LIGHT SPOTS****   TODO: Commented out, due to problems with transition Artifacts.
@@ -371,9 +412,10 @@ MRT main(VSOutput vsOutput)
     
     // Tiles
 
-    uint2 tilePos = GetTilePos(pixelPos, InvTileDim.xy);
-    uint tileIndex = GetTileIndex(tilePos, TileCount.x);
+    uint2 tilePosition = GetTilePos(pixelPos, InvTileDim.xy);
+    uint tileIndex = GetTileIndex(tilePosition, TileCount.x);
     uint tileOffset = GetTileOffset(tileIndex);
+    uint offset = 4;
 
     // Light Grid Preloading setup
     uint lightBitMaskGroups[4] = { 0, 0, 0, 0 };
@@ -397,6 +439,12 @@ MRT main(VSOutput vsOutput)
     lightData.pos, \
     lightData.radiusSq, \
     lightData.color
+
+#define SPOT_LIGHT_PARAMS \
+    POINT_LIGHT_PARAMS,    lightData.coneDir, lightData.coneAngles
+
+#define SHADOWED_LIGHT_PARAMS \
+    SPOT_LIGHT_PARAMS, lightData.shadowTextureMatrix, lightIndex
 
 #define CONE_LIGHT_ARGS \
     POINT_LIGHT_ARGS, \
@@ -515,10 +563,10 @@ MRT main(VSOutput vsOutput)
             uint tileLightCountCone = (tileLightCount >> 8) & 0xff;
             uint tileLightCountConeShadowed = (tileLightCount >> 16) & 0xff;
 
-            uint tileLightLoadOffset = uniformTileOffset + 4;
+            uint tileLightLoadOffset = uniformTileOffset + offset;
 
             // sphere
-            for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += 4)
+            for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += offset)
             {
                 uint lightIndex = lightGrid.Load(tileLightLoadOffset);
                 LightData lightData = lightBuffer[lightIndex];
@@ -526,7 +574,7 @@ MRT main(VSOutput vsOutput)
             }
 
             // cone
-            for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += 4)
+            for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += offset)
             {
                 uint lightIndex = lightGrid.Load(tileLightLoadOffset);
                 LightData lightData = lightBuffer[lightIndex];
@@ -534,7 +582,7 @@ MRT main(VSOutput vsOutput)
             }
 
             // cone w/ shadow map
-            for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += 4)
+            for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += offset)
             {
                 uint lightIndex = lightGrid.Load(tileLightLoadOffset);
                 LightData lightData = lightBuffer[lightIndex];
@@ -556,12 +604,12 @@ MRT main(VSOutput vsOutput)
         uint tileLightCount = lightGrid.Load(tileOffset + 0);
         uint tileLightCountSphere = (tileLightCount >> 0) & 0xff;
         uint tileLightCountCone = (tileLightCount >> 8) & 0xff;
-        uint tileLightCountConeShadowed = (tileLightCount >> 16) & 0xff;
+        uint tileLightCountConeShadowed = (tileLightCount >> 32) & 0xff;
 
         uint tileLightLoadOffset = tileOffset + 4;
 
         // sphere
-        for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += 4)
+        for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += offset)
         {
             uint lightIndex = lightGrid.Load(tileLightLoadOffset);
             LightData lightData = lightBuffer[lightIndex];
@@ -569,7 +617,7 @@ MRT main(VSOutput vsOutput)
         }
 
         // cone
-        for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += 4)
+        for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += offset)
         {
             uint lightIndex = lightGrid.Load(tileLightLoadOffset);
             LightData lightData = lightBuffer[lightIndex];
@@ -577,7 +625,7 @@ MRT main(VSOutput vsOutput)
         }
 
         // cone w/ shadow map
-        for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += 4)
+        for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += offset)
         {
             uint lightIndex = lightGrid.Load(tileLightLoadOffset);
             LightData lightData = lightBuffer[lightIndex];
@@ -590,12 +638,12 @@ MRT main(VSOutput vsOutput)
         uint tileLightCount = lightGrid.Load(tileOffset + 0);
         uint tileLightCountSphere = (tileLightCount >> 0) & 0xff;
         uint tileLightCountCone = (tileLightCount >> 8) & 0xff;
-        uint tileLightCountConeShadowed = (tileLightCount >> 16) & 0xff;
+        uint tileLightCountConeShadowed = (tileLightCount >> 32) & 0xff;
 
-        uint tileLightLoadOffset = tileOffset + 4;
+        uint tileLightLoadOffset = tileOffset + offset;
 
         // sphere
-        for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += 4)
+        for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += offset)
         {
             uint lightIndex = lightGrid.Load(tileLightLoadOffset);
             LightData lightData = lightBuffer[lightIndex];
@@ -603,7 +651,7 @@ MRT main(VSOutput vsOutput)
         }
 
         // cone
-        for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += 4)
+        for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += offset)
         {
             uint lightIndex = lightGrid.Load(tileLightLoadOffset);
             LightData lightData = lightBuffer[lightIndex];
@@ -611,7 +659,7 @@ MRT main(VSOutput vsOutput)
         }
 
         // cone w/ shadow map
-        for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += 4)
+        for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += offset)
         {
             uint lightIndex = lightGrid.Load(tileLightLoadOffset);
             LightData lightData = lightBuffer[lightIndex];
@@ -624,12 +672,12 @@ MRT main(VSOutput vsOutput)
     uint tileLightCount = lightGrid.Load(tileOffset + 0);
     uint tileLightCountSphere = (tileLightCount >> 0) & 0xff;
     uint tileLightCountCone = (tileLightCount >> 8) & 0xff;
-    uint tileLightCountConeShadowed = (tileLightCount >> 16) & 0xff;
+    uint tileLightCountConeShadowed = (tileLightCount >> 32) & 0xff;
 
-    uint tileLightLoadOffset = tileOffset + 4;
+    uint tileLightLoadOffset = tileOffset + offset;
 
     // sphere
-    for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += 4)
+    for (uint n = 0; n < tileLightCountSphere; n++, tileLightLoadOffset += offset)
     {
         uint lightIndex = lightGrid.Load(tileLightLoadOffset);
         LightData lightData = lightBuffer[lightIndex];
@@ -637,7 +685,7 @@ MRT main(VSOutput vsOutput)
     }
 
     // cone
-    for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += 4)
+    for (uint n = 0; n < tileLightCountCone; n++, tileLightLoadOffset += offset)
     {
         uint lightIndex = lightGrid.Load(tileLightLoadOffset);
         LightData lightData = lightBuffer[lightIndex];
@@ -645,7 +693,7 @@ MRT main(VSOutput vsOutput)
     }
 
     // cone w/ shadow map
-    for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += 4)
+    for (uint n = 0; n < tileLightCountConeShadowed; n++, tileLightLoadOffset += offset)
     {
         uint lightIndex = lightGrid.Load(tileLightLoadOffset);
         LightData lightData = lightBuffer[lightIndex];
@@ -661,10 +709,9 @@ MRT main(VSOutput vsOutput)
 
     if (AreNormalsNeeded)
     {
-        float reflection = specularMask * pow(1.0 - saturate(dot(-viewDir, normal)), 5.0);
+        float reflection = specularMask * pow(1.0 - saturate(dot(-viewDir, normal)), 2.0);
         mrt.Normal = float4(normal, reflection);
     }
-
     return mrt;
 }
 
@@ -672,3 +719,6 @@ MRT main(VSOutput vsOutput)
 #undef POINT_LIGHT_PARAMS
 #undef SPOT_LIGHT_PARAMS
 #undef SHADOWED_LIGHT_PARAMS
+#undef POINT_LIGHT_ARGS
+#undef CONE_LIGHT_ARGS
+#undef SHADOWED_LIGHT_ARGS

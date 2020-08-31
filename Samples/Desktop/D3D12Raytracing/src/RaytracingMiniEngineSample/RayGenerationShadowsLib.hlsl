@@ -1,14 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
 #define HLSL
 #include "ModelViewerRaytracing.h"
 
@@ -35,16 +24,15 @@ void RayGen()
     float4 unprojected = mul(g_dynamic.cameraToWorld, float4(screenPos, sceneDepth, 1));
     float3 world = unprojected.xyz / unprojected.w;
 
-    // R
     float3 direction = SunDirection;
-    float3 origin = world;
+    float3 rayOrigin = world;
 
-    RayDesc rayDesc = { origin,
-        0.1f,
+    RayDesc rayDesc = { rayOrigin,
+        0.0f,
         direction,
         FLT_MAX };
     RayPayload payload = { false, FLT_MAX };
-    TraceRay(g_accel, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, ~0,0,1,0, rayDesc, payload);
+    TraceRay(g_accelerationStructure, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, ~0,0,1,0, rayDesc, payload);
 
     if (payload.RayHitT < FLT_MAX)
     {

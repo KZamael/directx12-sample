@@ -892,18 +892,18 @@ void RaytracingMiniEngineSample::Startup( void )
     UINT numMeshes = m_Model.m_Header.meshCount;
 
     const UINT numBottomLevels = 1;
+    const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlag = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo;
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelAccelerationStructureDesc = {};
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &topLevelInputs = topLevelAccelerationStructureDesc.Inputs;
     topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
     topLevelInputs.NumDescs = numBottomLevels;
-    topLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    topLevelInputs.Flags = buildFlag;
     topLevelInputs.pGeometryDescs = nullptr;
     topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     g_pRaytracingDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
     
-    const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlag = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs(m_Model.m_Header.meshCount);
     UINT64 scratchBufferSizeNeeded = topLevelPrebuildInfo.ScratchDataSizeInBytes;
     for (UINT i = 0; i < numMeshes; i++)
@@ -1003,7 +1003,7 @@ void RaytracingMiniEngineSample::Startup( void )
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Create Acceleration Structure");
     ID3D12GraphicsCommandList *pCommandList = gfxContext.GetCommandList();
 
-    CComPtr<ID3D12GraphicsCommandList4> pRaytracingCommandList;
+    CComPtr<ID3D12GraphicsCommandList5> pRaytracingCommandList;
     pCommandList->QueryInterface(IID_PPV_ARGS(&pRaytracingCommandList));
 
     ID3D12DescriptorHeap *descriptorHeaps[] = { &g_pRaytracingDescriptorHeap->GetDescriptorHeap() };

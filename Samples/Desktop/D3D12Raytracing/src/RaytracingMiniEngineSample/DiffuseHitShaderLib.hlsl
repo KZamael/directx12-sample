@@ -309,7 +309,7 @@ void Hit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
         RayPayload shadowPayload;
         shadowPayload.SkipShading = true;
         shadowPayload.RayHitT = FLT_MAX;
-        TraceRay(g_accel, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,~0,0,1,0,rayDesc,shadowPayload);
+        TraceRay(g_accelerationStructure, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,~0,0,1,0,rayDesc,shadowPayload);
         if (shadowPayload.RayHitT < FLT_MAX)
         {
             shadow = 0.0;
